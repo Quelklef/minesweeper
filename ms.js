@@ -255,12 +255,6 @@ function genGame(board) {
 
         return ret;
     }
-    game.chord$ = ($cell) => {
-        // If a cell has all neighboring mines flag$ged, proc all non-flag$s
-        let $neis = game.$(game.neighbors$($cell));
-        if ($neis.filter(game.isFlagged$).length == game.get$($cell))
-            $neis.filter(c => !game.isFlagged$(c)).forEach(game.proc$);
-    }
 
     let updateBombCount = () => dispBombsLeft(!boardDisturbed ? cMineCount() : game.board.mineCount - game.flagCount);
     updateBombCount();
@@ -420,12 +414,8 @@ window.addEventListener('keydown', function(e) {
                 if (!boardDisturbed && !game.isFlagged$(game.$sel)) // Noop if an empty cell (.isFlagged$ is code smell?)
                     playReal();
 
-                if (!game.ended) {
-                    if (game.isRevealed$(game.$sel))
-                        game.chord$(game.$sel);
-                    else
-                        game.proc$(game.$sel);
-                }
+                if (!game.ended)
+                      game.proc$(game.$sel);
             }
             break;
 
