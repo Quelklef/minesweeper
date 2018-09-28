@@ -1,0 +1,29 @@
+<html>
+    <head>
+	<title>Keyboard minesweeper</title>
+        <link rel="stylesheet" type="text/css" href="css.css">
+        <script src="lib/cookies.min.js"></script>
+        <script src="ms.js"></script>
+    </head>
+    <body>
+        <div id="wrap">
+            <p class="note"><span id="width">W</span> x <span id="height">H</span>. <span id="mine-count">B</span> mines (<span id="mine-count-percent">P</span>%).</p>
+            <div id="ms-wrap"></div>
+            <div class="controls">
+                <p>Arrow keys / <code>hjkl</code>: move</p>
+                <p><code>F</code>: flag</p>
+                <p>Space: reveal / <a href="http://www.minesweeper.info/wiki/Chord">chord</a></p>
+                <p><code>R</code>: reset</p>
+            </div>
+            <div class="controls">
+                <p><code>[]</code>: board width down/up</p>
+                <p><code>;'</code>: board height down/up</p>
+                <p><code>,.</code>: mine count down/up</p>
+            </div>
+            <div id="status">
+                <p><span id="mines-left">N</span> mines remain.</p>
+            </div>
+	</div>
+        <p id="lydia-mode"></p>
+    </body>
+</html>
