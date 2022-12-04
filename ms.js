@@ -384,6 +384,14 @@ window.addEventListener('keydown', function(e) {
             || e.keyCode == 40
         ) ? 5 : 1;
 
+
+    // Arrow keys are used for moving around the game board; prevent
+    // them from also scrolling the page.
+    const arrows = [ 37, 38, 39, 40 ];
+    if (arrows.includes(e.keyCode))
+      e.preventDefault();
+
+
     switch(e.keyCode) {
         case 38: // Up
         case 75: // K
