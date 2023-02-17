@@ -354,10 +354,14 @@ function Game_patch(game, $mountpoint) {
   }
 
   // Game termination state
-  if (game.termination === 'win')
-    $grid.classList.add('win');
-  if (game.termination === 'loss')
-    $grid.classList.add('loss');
+  switch (game.termination) {
+    case 'win': $grid.classList.add('win'); break;
+    case 'loss': $grid.classList.add('loss'); break;
+    default:
+      $grid.classList.remove('win');
+      $grid.classList.remove('loss');
+      break;
+  }
 
   // Mines remaining counter
   const $minesRemaining = $mountpoint.querySelector('.mines-remaining');
