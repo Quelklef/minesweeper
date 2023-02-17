@@ -1,29 +1,623 @@
+<!doctype html>
 <html>
-    <head>
-	<title>Keyboard minesweeper</title>
-        <link rel="stylesheet" type="text/css" href="css.css">
-        <script src="lib/cookies.min.js"></script>
-        <script src="ms.js"></script>
-    </head>
-    <body>
-        <div id="wrap">
-            <p class="note"><span id="width">W</span> x <span id="height">H</span>. <span id="mine-count">B</span> mines (<span id="mine-count-percent">P</span>%).</p>
-            <div id="ms-wrap"></div>
-            <div class="controls">
-                <p>Arrow keys / <code>hjkl</code>: move</p>
-                <p><code>F</code>: flag</p>
-                <p>Space: reveal</p>
-                <p><code>R</code>: reset</p>
-            </div>
-            <div class="controls">
-                <p><code>[]</code>: board width down/up</p>
-                <p><code>;'</code>: board height down/up</p>
-                <p><code>,.</code>: mine count down/up</p>
-            </div>
-            <div id="status">
-                <p><span id="mines-left">N</span> mines remain.</p>
-            </div>
-	</div>
-        <p id="lydia-mode"></p>
-    </body>
+<head>
+  <meta charset="utf-8" />
+  <title>Keyboard-only Minesweeper</title>
+</head>
+<body>
+
+<script>
+
+// https://stackoverflow.com/a/2450976/4608364
+function Array_shuffle(ar) {
+  let ci = ar.length, ri;
+  while (ci != 0) {
+    ri = Math.floor(Math.random() * ci);
+    ci--;
+    [ar[ci], ar[ri]] = [ar[ri], ar[ci]];
+  }
+  return ar;
+}
+
+function Array_2dInit(h, w, f) {
+  const ar = [];
+  for (let y = 0; y < h; y++) {
+    const row = [];
+    for (let x = 0; x < w; x++ ) {
+      row.push(f(x, y));
+    }
+    ar.push(row);
+  }
+  return ar;
+}
+
+function mod(n, k) {
+  return ((n % k) + k) % k;
+}
+
+function Game_new() {
+  return {
+
+    options: {
+      showTimer: false,
+      gridWidth: 30,
+      gridHeight: 16,
+      bombDensity: .25,
+    },
+
+    grid: 'deferred',
+      // 'deferred' | 2d array of cell
+      // cell = { x: int, y: int, value: int, isBomb: bool, isFlagged: bool }
+
+    bombsFlagged: 0,
+    cellsRevealed: 0,
+
+    selection: { x: 0, y: 0 },
+
+    times: 'untimed',
+      // 'untimed' | { started: null | int timestamp, ended: null | int timestamp }
+
+    termination: 'in progress',
+      // 'in progress' | 'win' | 'loss'
+
+  };
+}
+
+function Game_serialize(game) {
+  return JSON.stringify(game);
+}
+
+function Game_deserialize(str) {
+  return JSON.parse(str)
+}
+
+function Game_reset(game) {
+  game.grid = 'deferred';
+  game.bombsFlagged = 0;
+  if (game.options.showTimer) {
+    game.times = { started: null, ended: null };
+  } else {
+    game.times = 'untimed';
+  }
+  game.termination = 'in progress';
+  game.selection.x = Math.min(game.selection.x, game.options.gridWidth);
+  game.selection.y = Math.min(game.selection.y, game.options.gridHeight);
+}
+
+function Game_calcArea(game) {
+  const opts = game.options;
+  return opts.gridWidth * opts.gridHeight;
+}
+
+function Game_calcBombCount(game) {
+  const opts = game.options;
+  return Math.round(opts.gridWidth * opts.gridHeight * opts.bombDensity);
+}
+
+function Game_nilCell(x, y) {
+  return {
+    x,
+    y,
+    value: 0,
+    isBomb: false,
+    isFlagged: false,
+    isRevealed: false,
+  };
+}
+
+function _Game_generateGrid(game, avoid) {
+  const grid = Array_2dInit(
+    game.options.gridHeight,
+    game.options.gridWidth,
+    (x, y) => Game_nilCell(x, y),
+  );
+
+  let bombCandidates = grid.flatMap((row, y) => row.map((_, x) => ({ x, y })))
+
+  // Ensure no bomb in 3x3 square around `avoid`
+  bombCandidates = bombCandidates.filter(({ x, y }) =>
+    Math.max(Math.abs(x - avoid.x) * Math.abs(y - avoid.y)) > 1);
+
+  const nBombs = Game_calcBombCount(game);
+  Array_shuffle(bombCandidates);
+  for (const { x, y } of bombCandidates.slice(0, nBombs)) {
+    grid[y][x].isBomb = true;
+    for (let xx = x - 1; xx <= x + 1; xx++) {
+      for (let yy = y - 1; yy <= y + 1; yy++) {
+        ((grid[yy] || {})[xx] || {}).value++;
+      }
+    }
+  }
+
+  game.grid = grid;
+  return game;
+}
+
+function _Game_ensureGrid(game, { x, y }) {
+  if (game.grid === 'deferred') _Game_generateGrid(game, { x, y });
+}
+
+function Game_reveal(game, { x, y }, now) {
+  _Game_ensureGrid(game, { x, y });
+
+  if (game.times !== 'untimed' && !game.times.started)
+    game.times.started = +now;
+
+  const queue = [{ x, y }];
+  while (queue.length > 0) {
+    const { x, y } = queue.pop();
+    game.grid[y][x].isRevealed = true;
+    game.cellsRevealed++;
+    if (game.grid[y][x].isBomb) {
+      game.termination = 'loss';
+      if (game.times !== 'untimed')
+        game.times.ended = +now;
+    }
+    if (game.grid[y][x].value === 0) {
+      for (let xx = x - 1; xx <= x + 1; xx++) {
+        for (let yy = y - 1; yy <= y + 1; yy++) {
+          const nbhr = (game.grid[yy] || {})[xx];
+          if (nbhr && !nbhr.isRevealed)
+            queue.push({ x: nbhr.x, y: nbhr.y });
+        }
+      }
+    }
+  }
+
+  if (game.cellsRevealed + Game_calcBombCount(game) == Game_calcArea(game)) {
+    game.termination = 'win';
+    if (game.times !== 'untimed')
+      game.times.ended = +now;
+  }
+}
+
+function Game_toggleFlag(game, { x, y }) {
+  _Game_ensureGrid(game, { x, y });
+  const isNowFlagged = (game.grid[y][x].isFlagged = !(game.grid[y][x].isFlagged));
+  game.bombsFlagged += isNowFlagged ? +1 : -1;
+}
+
+function Game_move(game, f) {
+  game.selection = f(game.selection);
+  game.selection.x = mod(game.selection.x, game.options.gridWidth);
+  game.selection.y = mod(game.selection.y, game.options.gridHeight);
+}
+
+function Game_mount(game, $mountpoint, { onChange }) {
+
+  const $root = document.createElement('span');
+  $mountpoint.innerHTML = '';
+  $mountpoint.append($root);
+
+  // Options
+  {
+    const $options = document.createElement('span');
+    $root.append($options);
+    $options.classList.add('options');
+
+    const $left = document.createElement('span');
+    const $right = document.createElement('span');
+    $options.append($left, $right)
+
+    const $width = document.createElement('input');
+    $left.append($width);
+    $width.type = 'number';
+    $width.min = 1;
+    $width.max = 100;
+    $width.value = game.options.gridWidth;
+
+    $left.append(' × ');
+
+    const $height = document.createElement('input');
+    $left.append($height);
+    $height.type = 'number';
+    $height.min = 1;
+    $height.max = 100;
+    $height.value = game.options.gridHeight;
+
+    $left.append(' w/ ');
+    const $bombCount = document.createElement('span');
+    $bombCount.classList.add('bomb-count');
+    $left.append($bombCount);
+    $left.append(' bombs');
+
+    $left.append(' (');
+
+    const $bombDensity = document.createElement('input');
+    $left.append($bombDensity);
+    $bombDensity.type = 'number';
+    $bombDensity.min = 0;
+    $bombDensity.max = 100;
+    $bombDensity.step = 5;
+    $bombDensity.value = game.options.bombDensity * 100;
+
+    $left.append('%)');
+
+    const $showTimer = document.createElement('input');
+    $right.append($showTimer);
+    $showTimer.id = 'show-timer';
+    $showTimer.type = 'checkbox';
+    $showTimer.checked = game.options.showTimer;
+
+    const $showTimerLabel = document.createElement('label');
+    $right.append($showTimerLabel);
+    $showTimerLabel.htmlFor = 'show-timer';
+    $showTimerLabel.innerText = ' timer';
+
+    'change input keydown'.split(' ').forEach(evName => {
+      $width.addEventListener(evName, ev => {
+        game.options.gridWidth = +ev.target.value;
+        onChange();
+      });
+    });
+    'change input keydown'.split(' ').forEach(evName => {
+      $height.addEventListener(evName, ev => {
+        game.options.gridHeight = +ev.target.value;
+        onChange();
+      });
+    });
+    'change input keydown'.split(' ').forEach(evName => {
+      $bombDensity.addEventListener(evName, ev => {
+        game.options.bombDensity = +ev.target.value / 100;
+        onChange();
+      });
+    });
+    $showTimer.addEventListener('change', ev => {
+      game.options.showTimer = ev.target.checked;
+      onChange();
+    });
+
+  }
+
+  // Grid
+  {
+    const $grid = document.createElement('table');
+    $root.append($grid);
+    $grid.classList.add('grid');
+  }
+
+  // Footer
+  {
+    const $footer = document.createElement('span');
+    $mountpoint.append($footer);
+    $footer.classList.add('footer');
+
+    $footer.innerHTML = String.raw`
+      <span class="controls">
+        <span>
+          <span class="key">←↑→↓</span> / <span class="key">hjkl</span>: move
+        </span>
+        <span><span class="key">F</span>: flag</span>
+        <span><span class="key">Space</span>: reveal</span>
+        <span><span class="key">R</span>: reset</span>
+      </span>
+      <span class="status-mines">
+        <span class="mines-remaining"></span> mines remain
+      </span>
+      <span class="status-timer"></span>
+    `;
+  }
+
+  Game_patch(game, $mountpoint);
+
+}
+
+function Game_patch(game, $mountpoint) {
+
+  // Options
+  const $options = $mountpoint.querySelector('.options');
+  if (game.grid === 'deferred') {
+    $options.classList.remove('disabled');
+    for (const $el of $mountpoint.querySelectorAll('input'))
+      $el.disabled = false;
+  } else {
+    $options.classList.add('disabled');
+    for (const $el of $mountpoint.querySelectorAll('input'))
+      $el.disabled = true;
+  }
+
+  // Bomb count
+  const $bombCount = $mountpoint.querySelector('.bomb-count');
+  $bombCount.innerText = Game_calcBombCount(game);
+
+  // Game grid
+  const $grid = $mountpoint.querySelector('.grid');
+  {
+    $grid.innerHTML = '';
+
+    const grid = (
+      game.grid !== 'deferred'
+      ? game.grid
+      : Array_2dInit(
+        game.options.gridHeight,
+        game.options.gridWidth,
+        (x, y) => Game_nilCell(x, y),
+      )
+    );
+
+    for (const row of grid) {
+      const $row = document.createElement('tr');
+      $row.classList.add('row');
+      $grid.append($row);
+      for (const cell of row) {
+        const $cell = document.createElement('td');
+        $row.append($cell);
+        $cell.classList.add('cell');
+        $cell.classList.add(`value-is-${cell.value}`);
+        if (cell.isBomb) $cell.classList.add('is-bomb');
+        if (cell.isFlagged) $cell.classList.add('is-flagged');
+        if (cell.isRevealed) $cell.classList.add('is-revealed');
+        if (cell.x === game.selection.x && cell.y === game.selection.y)
+          $cell.classList.add('is-selected');
+      }
+    }
+  }
+
+  // Game termination state
+  if (game.termination === 'win')
+    $grid.classList.add('win');
+  if (game.termination === 'loss')
+    $grid.classList.add('loss');
+
+  // Mines remaining counter
+  const $minesRemaining = $mountpoint.querySelector('.mines-remaining');
+  $minesRemaining.innerText = '' + (Game_calcBombCount(game) - game.bombsFlagged);
+
+  Game_patchTimerOnly(game, $mountpoint);
+
+}
+
+function Game_patchTimerOnly(game, $mountpoint) {
+
+  // Timer
+  const $timer = $mountpoint.querySelector('.status-timer');
+  if (game.times !== 'untimed' && game.times.started)
+    $timer.innerText = formatMillis(+(game.times.ended || new Date) - +game.times.started);
+  else
+    $timer.innerText = '';
+
+  function formatMillis(ms) {
+    const n = ms % 1000;
+    const s = Math.floor(ms / 1000) % 60;
+    const m = Math.floor(ms / 1000 / 60);
+    const str = (n, k) => ('' + n).padStart(k, '0');
+    return `${str(m, 2)}:${str(s, 2)}.${str(n, 3)}`;
+  }
+
+}
+
+
+
+function main() {
+  const $body = document.body;
+  const $mountpoint = document.createElement('div');
+  $body.append($mountpoint);
+
+  const game = (
+    localStorage.getItem('game')
+    ? Game_deserialize(localStorage.getItem('game'))
+    : Game_new()
+  );
+
+  Game_mount(game, $mountpoint, { onChange: changed });
+
+  setInterval(() => Game_patchTimerOnly(game, $mountpoint), 73);
+
+  function changed() {
+    if (game.grid === 'deferred')
+      Game_reset(game);  // re-up options
+    Game_patch(game, $mountpoint);
+    localStorage.setItem('game', Game_serialize(game));
+  }
+
+  $body.addEventListener('keydown', event => {
+
+    if (event.target !== $body)
+      return;
+
+    // Prevent scroll
+    if ('ArrowUp|ArrowDown|j|k| '.split('|').includes(event.key))
+        event.preventDefault();
+
+    switch (event.key) {
+      case 'ArrowUp'   : case 'k': Game_move(game, ({ x, y }) => ({ x, y: y - 1 })); break;
+      case 'ArrowDown' : case 'j': Game_move(game, ({ x, y }) => ({ x, y: y + 1 })); break;
+      case 'ArrowLeft' : case 'h': Game_move(game, ({ x, y }) => ({ x: x - 1, y })); break;
+      case 'ArrowRight': case 'l': Game_move(game, ({ x, y }) => ({ x: x + 1, y })); break;
+
+      case 'f': {
+        if (game.termination !== 'in progress') return;
+        const { x, y } = game.selection;
+        if (game.grid[y][x].isRevealed) return;
+        Game_toggleFlag(game, game.selection);
+      }
+      break;
+
+      case ' ':
+        if (game.termination !== 'in progress') return;
+        Game_reveal(game, game.selection, new Date);
+        break;
+
+      case 'r': Game_reset(game); break;
+
+      default: return;
+    }
+
+    changed();
+
+  });
+}
+
+main();
+
+
+</script>
+
+<style>
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  font-family: 'sans-serif';
+  background-color: rgb(240, 240, 240);
+}
+
+:root {
+  --grey: #8e8a8a;
+  --grey-dark: grey;
+  --red: #d61c1c;
+  --red-dark: #bf0b0b;
+  --blue: #3a6bd0;
+  --green: green;
+}
+
+.grid {
+  display: block;
+  white-space: nowrap;
+  border: 5px solid var(--grey-dark);
+  border-collapse: collapse;
+  background: white;
+}
+
+.grid.win {
+  border-color: var(--green);
+}
+.grid.loss {
+  border-color: red;
+}
+
+.row {
+  display: block;
+}
+
+.cell {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  position: relative;
+}
+
+.cell::before {
+  display: inline-block;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cell.value-is-1.is-revealed::before { color: rgb( 50, 0, 0); content: '1'; }
+.cell.value-is-2.is-revealed::before { color: rgb(100, 0, 0); content: '2'; }
+.cell.value-is-3.is-revealed::before { color: rgb(150, 0, 0); content: '3'; }
+.cell.value-is-4.is-revealed::before { color: rgb(200, 0, 0); content: '4'; }
+.cell.value-is-5.is-revealed::before { color: rgb(250, 0, 0); content: '5'; }
+.cell.value-is-6.is-revealed::before { color: rgb(255, 0, 0); content: '6'; }
+.cell.value-is-7.is-revealed::before { color: rgb(255, 0, 0); content: '7'; }
+.cell.value-is-8.is-revealed::before { color: rgb(255, 0, 0); content: '8'; }
+
+.cell:not(.is-revealed) {
+  background-color: var(--grey);
+  border: 1px solid var(--grey-dark);
+}
+.cell:not(.is-revealed)::before {
+  content: '?';
+  color: white;
+}
+
+.cell.is-selected {
+  border: 3px solid var(--blue) !important;
+}
+.cell:not(.is-revealed):not(.is-flagged).is-selected {
+  background-color: var(--blue);
+}
+
+.cell.is-flagged {
+  background-color: var(--red);
+  border: 1px solid var(--red-dark);
+}
+.cell.is-flagged::before {
+  content: '!!';
+  color: white;
+}
+
+.cell.is-revealed.is-bomb {
+  background-color: red;
+}
+.cell.is-revealed.is-bomb.is-flagged { /* Mark green correct guesses */
+  background-color: var(--green);
+}
+.cell.is-revealed.is-bomb::before {
+  content: 'B';
+  color: white;
+}
+
+
+input {
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.options, .footer {
+  font-size: 12px;
+}
+
+.options {
+  margin: 4em 0 .5em 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.options input[type=number] {
+  width: 10ch;
+}
+
+.options.disabled {
+  opacity: 0.8;
+}
+.options.disabled input {
+  opacity: 1;
+}
+
+.footer {
+  width: 100%;
+  display: block;
+}
+
+.footer .controls,
+.footer .status-mines,
+.footer .status-timer
+{
+  margin: 2rem 0;
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.footer .controls > * {
+  margin: 0 1em;
+}
+
+.footer .status-mines {
+  font-size: 1.5em;
+}
+.footer .status-mines .mines-remaining {
+  color: red;
+}
+
+.key {
+  padding: .05em .35em;
+  background-color: rgb(230, 230, 230);
+  border: 1px solid rgb(200, 200, 200);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+}
+
+
+
+</style>
+
+</body>
 </html>
