@@ -74,6 +74,7 @@ function Game_deserialize(str) {
 function Game_reset(game) {
   game.grid = 'deferred';
   game.bombsFlagged = 0;
+  game.cellsRevealed = 0;
   if (game.options.showTimer) {
     game.times = { started: null, ended: null };
   } else {
@@ -146,14 +147,21 @@ function Game_reveal(game, { x, y }, now) {
   const queue = [{ x, y }];
   while (queue.length > 0) {
     const { x, y } = queue.pop();
-    game.grid[y][x].isRevealed = true;
-    game.cellsRevealed++;
-    if (game.grid[y][x].isBomb) {
+
+    const cell = game.grid[y][x];
+    if (!cell.isRevealed) {
+      cell.isRevealed = true;
+      game.cellsRevealed++;
+    }
+
+    if (cell.isBomb) {
       game.termination = 'loss';
       if (game.times !== 'untimed')
         game.times.ended = +now;
     }
-    if (game.grid[y][x].value === 0) {
+
+    // Cascade on value-zero cells
+    if (cell.value === 0) {
       for (let xx = x - 1; xx <= x + 1; xx++) {
         for (let yy = y - 1; yy <= y + 1; yy++) {
           const nbhr = (game.grid[yy] || {})[xx];
