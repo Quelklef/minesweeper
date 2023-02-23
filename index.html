@@ -169,6 +169,14 @@ function Game_reveal(game, { x, y }, now) {
     if (game.times !== 'untimed')
       game.times.ended = +now;
   }
+
+  // If just terminated, reveal all bombs
+  if (game.termination !== 'in progress') {
+    for (const row of game.grid)
+      for (const cell of row)
+        if (cell.isBomb)
+          cell.isRevealed = true;
+  }
 }
 
 function Game_toggleFlag(game, { x, y }) {
