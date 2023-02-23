@@ -499,6 +499,7 @@ body {
   --red-dark: #bf0b0b;
   --blue: #3a6bd0;
   --green: green;
+  --green-dark: darkgreen;
 }
 
 .grid {
@@ -510,10 +511,10 @@ body {
 }
 
 .grid.win {
-  border-color: var(--green);
+  border-color: var(--green-dark);
 }
 .grid.loss {
-  border-color: red;
+  border-color: var(--red-dark);
 }
 
 .row {
@@ -570,10 +571,11 @@ body {
 }
 
 .cell.is-revealed.is-bomb {
-  background-color: red;
+  background-color: var(--red);
 }
 .cell.is-revealed.is-bomb.is-flagged { /* Mark green correct guesses */
   background-color: var(--green);
+  border: none;
 }
 .cell.is-revealed.is-bomb::before {
   content: 'B';
@@ -630,7 +632,7 @@ input {
   font-size: 1.5em;
 }
 .footer .status-mines .mines-remaining {
-  color: red;
+  color: var(--red);
 }
 
 .key {
