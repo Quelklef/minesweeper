@@ -117,7 +117,7 @@ function _Game_generateGrid(game, avoid) {
 
   // Ensure no bomb in 3x3 square around `avoid`
   bombCandidates = bombCandidates.filter(({ x, y }) =>
-    Math.max(Math.abs(x - avoid.x) * Math.abs(y - avoid.y)) > 1);
+    Math.max(Math.abs(x - avoid.x), Math.abs(y - avoid.y)) > 1);
 
   const nBombs = Game_calcBombCount(game);
   Array_shuffle(bombCandidates);
