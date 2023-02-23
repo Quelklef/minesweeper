@@ -138,6 +138,10 @@ function _Game_ensureGrid(game, { x, y }) {
   if (game.grid === 'deferred') _Game_generateGrid(game, { x, y });
 }
 
+function Game_getCell(game, { x, y }) {
+  return (game.grid[y] || {})[x];
+}
+
 function Game_reveal(game, { x, y }, now) {
   _Game_ensureGrid(game, { x, y });
 
@@ -455,6 +459,8 @@ function main() {
 
       case ' ':
         if (game.termination !== 'in progress') return;
+        if (game.grid !== 'deferred' && Game_getCell(game, game.selection).isFlagged)
+          return;
         Game_reveal(game, game.selection, new Date);
         break;
 
