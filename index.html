@@ -369,6 +369,18 @@ function Game_patch(game, $mountpoint) {
         if (cell.isRevealed) $cell.classList.add('is-revealed');
         if (cell.x === game.selection.x && cell.y === game.selection.y)
           $cell.classList.add('is-selected');
+
+        const $inner = document.createElement('span');
+        $cell.append($inner);
+        $inner.classList.add('inner');
+
+        const $label = document.createElement('span');
+        $inner.append($label);
+        $label.classList.add('label');
+
+        const $border = document.createElement('span');
+        $inner.append($border);
+        $border.classList.add('border');
       }
     }
   }
@@ -495,6 +507,7 @@ body {
 :root {
   --grey: #8e8a8a;
   --grey-dark: grey;
+  --grey-light: rgb(180, 180, 180);
   --red: #d61c1c;
   --red-dark: #bf0b0b;
   --blue: #3a6bd0;
@@ -503,7 +516,6 @@ body {
 }
 
 .grid {
-  display: block;
   white-space: nowrap;
   border: 5px solid var(--grey-dark);
   border-collapse: collapse;
@@ -517,18 +529,31 @@ body {
   border-color: var(--red-dark);
 }
 
-.row {
-  display: block;
-}
-
 .cell {
-  display: inline-block;
   width: 30px;
   height: 30px;
-  position: relative;
 }
 
-.cell::before {
+.cell .inner {
+  position: relative;
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.cell .inner .label,
+.cell .inner .border
+{
+  position: absolute;
+  display: inline-block;
+  height: 100%;
+  width: 100%;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cell .inner .label::before {
   display: inline-block;
   position: absolute;
   left: 50%;
@@ -536,50 +561,76 @@ body {
   transform: translate(-50%, -50%);
 }
 
-.cell.value-is-1.is-revealed::before { color: rgb( 50, 0, 0); content: '1'; }
-.cell.value-is-2.is-revealed::before { color: rgb(100, 0, 0); content: '2'; }
-.cell.value-is-3.is-revealed::before { color: rgb(150, 0, 0); content: '3'; }
-.cell.value-is-4.is-revealed::before { color: rgb(200, 0, 0); content: '4'; }
-.cell.value-is-5.is-revealed::before { color: rgb(250, 0, 0); content: '5'; }
-.cell.value-is-6.is-revealed::before { color: rgb(255, 0, 0); content: '6'; }
-.cell.value-is-7.is-revealed::before { color: rgb(255, 0, 0); content: '7'; }
-.cell.value-is-8.is-revealed::before { color: rgb(255, 0, 0); content: '8'; }
+.cell .inner .border {
+  box-sizing: initial;
+  z-index: 1;
+}
+
+.cell.value-is-1.is-revealed .label::before { color: rgb( 50, 0, 0); content: '1'; }
+.cell.value-is-2.is-revealed .label::before { color: rgb(100, 0, 0); content: '2'; }
+.cell.value-is-3.is-revealed .label::before { color: rgb(150, 0, 0); content: '3'; }
+.cell.value-is-4.is-revealed .label::before { color: rgb(200, 0, 0); content: '4'; }
+.cell.value-is-5.is-revealed .label::before { color: rgb(250, 0, 0); content: '5'; }
+.cell.value-is-6.is-revealed .label::before { color: rgb(255, 0, 0); content: '6'; }
+.cell.value-is-7.is-revealed .label::before { color: rgb(255, 0, 0); content: '7'; }
+.cell.value-is-8.is-revealed .label::before { color: rgb(255, 0, 0); content: '8'; }
 
 .cell:not(.is-revealed) {
   background-color: var(--grey);
-  border: 1px solid var(--grey-dark);
 }
-.cell:not(.is-revealed)::before {
+.cell:not(.is-revealed) .border {
+  border: 2px solid var(--grey-dark);
+  z-index: 1;
+}
+.cell:not(.is-revealed) .label::before {
   content: '?';
+  color: var(--grey-light);
+}
+.cell:not(.is-revealed).is-selected .label::before {
   color: white;
 }
 
-.cell.is-selected {
-  border: 3px solid var(--blue) !important;
+.cell.is-selected .inner .border {
+  border: 4px solid var(--blue) !important;
+  z-index: 3 !important;
 }
-.cell:not(.is-revealed):not(.is-flagged).is-selected {
+.cell.is-selected:not(.is-revealed):not(.is-flagged) {
   background-color: var(--blue);
 }
 
 .cell.is-flagged {
   background-color: var(--red);
-  border: 1px solid var(--red-dark);
 }
-.cell.is-flagged::before {
-  content: '!!';
+.cell.is-flagged .inner .border {
+  border: 2px solid var(--red-dark);
+  z-index: 2;
+}
+.cell.is-flagged .label::before {
+  content: '⚑';
   color: white;
 }
 
+
+/* Mark red revealed bombs */
 .cell.is-revealed.is-bomb {
   background-color: var(--red);
 }
-.cell.is-revealed.is-bomb.is-flagged { /* Mark green correct guesses */
-  background-color: var(--green);
-  border: none;
+.cell.is-revealed.is-bomb .inner .border {
+  border: 2px solid var(--red-dark);
+  z-index: 2;
 }
-.cell.is-revealed.is-bomb::before {
-  content: 'B';
+.cell.is-revealed.is-bomb .label::before {
+  content: '💣';
   color: white;
+}
+
+/* Mark green correct flags */
+.cell.is-revealed.is-bomb.is-flagged {
+  background-color: var(--green);
+}
+.cell.is-revealed.is-bomb.is-flagged .inner .border {
+  border: 2px solid var(--green-dark);
+  z-index: 2;
 }
 
 
