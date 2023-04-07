@@ -343,7 +343,6 @@ function Game_patch(game, $mountpoint) {
   // Game grid
   const $grid = $mountpoint.querySelector('.grid');
   {
-    $grid.innerHTML = '';
 
     const grid = (
       game.grid !== 'deferred'
@@ -355,32 +354,68 @@ function Game_patch(game, $mountpoint) {
       )
     );
 
-    for (const row of grid) {
-      const $row = document.createElement('tr');
-      $row.classList.add('row');
-      $grid.append($row);
-      for (const cell of row) {
-        const $cell = document.createElement('td');
-        $row.append($cell);
-        $cell.classList.add('cell');
-        $cell.classList.add(`value-is-${cell.value}`);
-        if (cell.isBomb) $cell.classList.add('is-bomb');
-        if (cell.isFlagged) $cell.classList.add('is-flagged');
-        if (cell.isRevealed) $cell.classList.add('is-revealed');
-        if (cell.x === game.selection.x && cell.y === game.selection.y)
-          $cell.classList.add('is-selected');
+    // Add rows/cells
+    for (let y = 0; y < grid.length; y++) {
+      const row = grid[y];
+      let $row;
+      $row = $grid.children[y];
+      if (!$row) {
+        $row = document.createElement('tr');
+        $row.classList.add('row');
+        $grid.append($row);
+      }
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        let $cell;
+        $cell = $row.children[x];
+        if (!$cell) {
+          $cell = document.createElement('td');
+          $cell.classList.add('cell');
+          $row.append($cell);
 
-        const $inner = document.createElement('span');
-        $cell.append($inner);
-        $inner.classList.add('inner');
+          const $inner = document.createElement('span');
+          $cell.append($inner);
+          $inner.classList.add('inner');
+          const $label = document.createElement('span');
+          $inner.append($label);
+          $label.classList.add('label');
+          const $border = document.createElement('span');
+          $inner.append($border);
+          $border.classList.add('border');
+        }
+      }
+    }
 
-        const $label = document.createElement('span');
-        $inner.append($label);
-        $label.classList.add('label');
+    // Remove rows/cells
+    while ($grid.children.length > grid.length) {
+      Array.from($grid.children).reverse()[0].remove();
+    }
+    if (grid.length > 0) {
+      const width = grid[0].length;
+      for (const $row of $grid.children) {
+        while ($row.children.length > width) {
+          Array.from($row.children).reverse()[0].remove();
+        }
+      }
+    }
 
-        const $border = document.createElement('span');
-        $inner.append($border);
-        $border.classList.add('border');
+    // Update rows/cells
+    for (let y = 0; y < grid.length; y++) {
+      const row = grid[y];
+      const $row = $grid.children[y];
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        const $cell = $row.children[x];
+
+        for (let val = 0; val <= 8; val++) {
+          classList_set($cell.classList, `value-is-${val}`, val === cell.value);
+          // doing something trivial nine times is better than inducing a reflow
+        }
+
+        classList_set($cell.classList, 'is-bomb', cell.isBomb);
+        classList_set($cell.classList, 'is-flagged', cell.isFlagged);
+        classList_set($cell.classList, 'is-revealed', cell.isRevealed);
+        classList_set($cell.classList, 'is-selected', cell.x === game.selection.x && cell.y === game.selection.y);
       }
     }
   }
@@ -400,6 +435,12 @@ function Game_patch(game, $mountpoint) {
   $minesRemaining.innerText = '' + (Game_calcBombCount(game) - game.bombsFlagged);
 
   Game_patchTimerOnly(game, $mountpoint);
+
+
+  function classList_set(classList, clazz, isSet) {
+    if (isSet && !classList.contains(clazz)) classList.add(clazz);
+    if (!isSet && classList.contains(clazz)) classList.remove(clazz);
+  }
 
 }
 
