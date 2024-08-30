@@ -35,6 +35,10 @@ function mod(n, k) {
   return ((n % k) + k) % k;
 }
 
+function clamp(x, lo, hi) {
+  return Math.max(Math.min(x, hi), lo);
+}
+
 function Game_new() {
   return {
 
@@ -222,8 +226,6 @@ function Game_mount(game, $mountpoint, { onChange }) {
     const $width = document.createElement('input');
     $left.append($width);
     $width.type = 'number';
-    $width.min = 1;
-    $width.max = 100;
     $width.value = game.options.gridWidth;
 
     $left.append(' × ');
@@ -231,8 +233,6 @@ function Game_mount(game, $mountpoint, { onChange }) {
     const $height = document.createElement('input');
     $left.append($height);
     $height.type = 'number';
-    $height.min = 1;
-    $height.max = 100;
     $height.value = game.options.gridHeight;
 
     $left.append(' w/ ');
@@ -246,8 +246,6 @@ function Game_mount(game, $mountpoint, { onChange }) {
     const $bombDensity = document.createElement('input');
     $left.append($bombDensity);
     $bombDensity.type = 'number';
-    $bombDensity.min = 0;
-    $bombDensity.max = 100;
     $bombDensity.step = 5;
     $bombDensity.value = game.options.bombDensity * 100;
 
@@ -264,21 +262,27 @@ function Game_mount(game, $mountpoint, { onChange }) {
     $showTimerLabel.htmlFor = 'show-timer';
     $showTimerLabel.innerText = ' timer';
 
-    'change input keydown'.split(' ').forEach(evName => {
+    'change input'.split(' ').forEach(evName => {
       $width.addEventListener(evName, ev => {
-        game.options.gridWidth = +ev.target.value;
+        value = clamp(+ev.target.value, 1, 99);
+        $width.value = value;
+        game.options.gridWidth = value;
         onChange();
       });
     });
-    'change input keydown'.split(' ').forEach(evName => {
+    'change input'.split(' ').forEach(evName => {
       $height.addEventListener(evName, ev => {
-        game.options.gridHeight = +ev.target.value;
+        value = clamp(+ev.target.value, 1, 99);
+        $height.value = value;
+        game.options.gridHeight = value;
         onChange();
       });
     });
-    'change input keydown'.split(' ').forEach(evName => {
+    'change input'.split(' ').forEach(evName => {
       $bombDensity.addEventListener(evName, ev => {
-        game.options.bombDensity = +ev.target.value / 100;
+        value = clamp(+ev.target.value, 0, 100);
+        $bombDensity.value = value;
+        game.options.bombDensity = value / 100;
         onChange();
       });
     });
